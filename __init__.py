@@ -4,8 +4,9 @@ Released under the MIT license
 https://opensource.org/licenses/mit-license.php
 
 """
-
+#blender内蔵の機能を使えるようにする1
 import bpy
+#blender内蔵の機能を使えるようにする2
 from mathutils import Vector
 
 #Blenderのaddon情報を記載する（dict形式　"key":"値" で書く、１要素ごとにコンマで区切る）
