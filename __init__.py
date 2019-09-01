@@ -44,19 +44,42 @@ class ICYP_OT_metaballs_from_bone(bpy.types.Operator):
         #armatureに入っているオブジェクトがアーマチュアでなければ、実行を終了する（なにもしない）
         if armature.type != "ARMATURE":
             return {'FINISHED'}
-        #アーマチュアの編集モードに入る（アーマチュアの編集モードでのみボーンの頭座標と尻尾座標を取れるEditBone変数を扱えるため
+        #アーマチュアの編集モードに入る（アーマチュアの編集モードでのみボーンの頭座標と尻尾座標を取れるEditBone変数を扱えるため #嘘でしたごめんなさいbonesで取れます（readonly=編集は出来ないですが
         bpy.ops.object.mode_set(mode='EDIT')
-        #ボーンの位置を格納するリスト
+        #メタボールの置きたい座標を記録するリスト
         positions = []
-        #ボーンの長さを格納するリスト
+        #メタボールの大きさを格納するリスト
         sizes = []
         #EditBonesリストの中身を一つずつedb変数に格納して順番に見ていく
+        #positionsとsizesに同じものから見た要素を作っていくことで、positionsとsizesの中身はボーンの毎の対になる
         for edb in armature.data.edit_bones:
-            #リスト内包表記（python独自の文法）にて、positionsとsizesにそれぞれ内容を入れていく
-            #edb.tail+edb.head/2でボーンの中間座標を得る
-            positions.append([(edb.tail[i]+edb.head[i])/2 for i in range(3)])
-            #edb.tail-edb.headでボーンのベクトルを得る（先->根のベクトル
-            sizes.append([(edb.tail[i]-edb.head[i]) for i in range(3)])
+            pos = [0,0,0] #メタボールの置きたい座標を記録する変数を作る
+            #メタボールの置きたい場所をposに設定する
+            #座標は3要素なので、range(3) で呼ばれるたびに、0から1ずつ足したものをiに代入して、iが2になったら次で終了するfor文
+            for i in range(3):
+                #posのi番目（X:0番目,Y:1番目,Z:2番目）（プログラミングでは順番は0番目からはじまります）
+                #の要素に、edit_bone(edb)の先端の座標のi番目（X:0番目ry）の要素から、edit_boneの根本の座標のi要素（ｒｙ）を足して2で割ったもの
+                #つまり、ボーンの真ん中の座標をそれぞれ代入します
+                pos[i] =  (edb.tail[i] + edb.head[i]) /2 
+            #メタボールの置きたい場所を記録するリストに、座標の変数を追加する
+            positions.append(pos)
+
+            #ボーンのサイズを格納する変数
+            size = 0.5
+            #一時的にボーンのベクトルを格納する変数
+            bone_vector = [0,0,0]
+            #XYZ各要素について、ボーンがどこを向いているかを計算する
+            #下のfor文と下の文と同義
+            #bone_vector[0] = edb.head[0] - edb.tail[0] # X座標についてボーンがどっちを向いているか
+            #bone_vector[1] = edb.head[1] - edb.tail[1] # Y座標について（ｒｙ
+            #bone_vector[2] = edb.head[2] - edb.tail[2] # Z（ｒｙ
+            for i in range(3):
+                bone_vector[i] = edb.head[i] - edb.tail[i]
+            #ボーンのベクトルをリスト型から、BlenderのmathutilsのVector型にキャスト（変換）して、length要素でその長さを得る
+            size = Vector(bone_vector).length
+            #メタボールのサイズのリストに、求めたサイズを追加する
+            sizes.append(size)
+        
         #メタボールを追加する方に手順に入りたいのでいったんオブジェクトモードに戻る
         bpy.ops.object.mode_set(mode='OBJECT')
         #メタボールをつくって、それを変数mbに格納する（せつめいしづらい
@@ -80,7 +103,7 @@ class ICYP_OT_metaballs_from_bone(bpy.types.Operator):
             #メタボールの座標をposとする（ボーンの中間座標
             elem.co = pos
             #メタボールのサイズにメタボールサイズの係数 x ボーンのベクトルの長さの1/2を代入する
-            elem.radius = self.metaball_size * Vector(si).length/2
+            elem.radius = self.metaball_size * si/2
             #メタボールのサイズがいままでで一番小さい時
             if min_size > elem.radius:
                 #そのサイズを記録する
@@ -88,11 +111,14 @@ class ICYP_OT_metaballs_from_bone(bpy.types.Operator):
             #備考：オペレータでメタボールを追加すると死ぬほど動作が遅かったのでこの作り方になっています
         #メタボールの一番小さいサイズをメタボールのビューポート表示閾値に設定する
         mb.resolution = min_size
-        #終わり
+        #メタボールの一番小さいサイズをメタボールのレンダリング表示閾値に設定する
+        mb.render_resolution = min_size
+        #正常終了しました
         return {'FINISHED'}
 
-#BlenderのUIに上のオペレータを追加するコード
+#BlenderのUIに上のオペレータを追加するコード１
 def add_metaball_icyp(self, context):
+    #メタボールの欄に追加するときに、どの関数を、どういう表示名で、どういうアイコンで表示するかを示す
     op = self.layout.operator(ICYP_OT_metaballs_from_bone.bl_idname, text="add metaball from active armature",icon="META_BALL")
 
 #オペレータクラスをリストに記録する
@@ -104,7 +130,7 @@ def register():
     #先のリストに記録されたクラスをBlenderに登録する
     for cls in classes:
         bpy.utils.register_class(cls)
-    #BlenderのUIに上のオペレータを追加するコードその2
+    #BlenderのUI（メタボールの欄）に上のオペレータを追加するコード２
     bpy.types.VIEW3D_MT_metaball_add.append(add_metaball_icyp)
     
 
